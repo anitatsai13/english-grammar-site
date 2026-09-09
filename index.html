@@ -50,6 +50,22 @@
     padding:5px 16px;border-radius:999px}
   .gcard h3{margin:18px 0 8px;font-size:1.1rem;font-weight:900;color:var(--brand-d);border-left:5px solid var(--brand);
     padding:5px 12px;background:var(--brand-l);border-radius:0 8px 8px 0}
+  /* ===== 搜尋 ===== */
+  .searchbar{margin:10px 0 0}
+  .searchbar input{width:100%;box-sizing:border-box;padding:10px 14px;border:1.5px solid var(--line);
+    border-radius:12px;font-size:.95rem;background:var(--card);color:var(--ink)}
+  .searchbar input:focus{outline:none;border-color:var(--brand)}
+  #sout{background:var(--card);border-radius:14px;box-shadow:var(--shadow);padding:6px 12px;margin:8px 0}
+  .snote{font-size:.82rem;color:var(--muted);margin:7px 0 3px;font-weight:700}
+  .scard{display:block;width:100%;text-align:left;background:none;border:none;border-bottom:1px solid var(--line);
+    padding:9px 4px;font-size:.93rem;cursor:pointer;color:var(--ink);font-family:inherit}
+  .scard b{color:var(--brand-d)}
+  .scard:last-of-type{border-bottom:none}
+  .sq{border-bottom:1px solid var(--line);padding:8px 4px}
+  .sq:last-of-type{border-bottom:none}
+  .sq summary{cursor:pointer;font-size:.9rem;line-height:1.5}
+  .sq .sqa{margin:7px 0 2px;font-size:.9rem;line-height:1.6}
+  .tagb{display:inline-block;background:var(--brand-l);color:var(--brand-d);border-radius:6px;padding:1px 7px;font-size:.78rem;margin-right:6px}
   /* 展開圖（樹狀） */
   .xmap{margin:12px 0}
   .xroot{display:inline-block;background:var(--brand);color:#fff;font-weight:900;font-size:1.02rem;
@@ -137,6 +153,8 @@
   <p>EASON 的文法教室：學習重點＋練習題</p>
 </header>
 <div class="wrap">
+  <div class="searchbar"><input id="sbox" type="search" placeholder="🔍 搜尋：文法重點、題目、解析…"></div>
+  <div id="sout" hidden></div>
   <div class="row" id="bookRow"></div>
   <div class="tabs">
     <button class="tab active" data-tab="learn">📖 學習重點</button>
@@ -1674,6 +1692,41 @@ function renderWrong(){
     qStart(p);
   };
 }
+/* ===== 搜尋 ===== */
+const S_CARDS=[...document.querySelectorAll(".gcard")].map(c=>{
+  const pane=c.closest(".lpane");
+  return {el:c,bk:pane?pane.id.slice(6):"",title:(c.querySelector("h2")||{textContent:""}).textContent,low:c.textContent.toLowerCase()};
+});
+function sPlain(s){return s.replace(/<br\s*\/?>/gi,"　").replace(/<[^>]*>/g,"");}
+function sQHtml(q,i){
+  const opts=q.opts.map((o,j)=>(j===q.ans?"<b class='rd'>✔ ":"")+"("+"ABCD"[j]+") "+esc(o)+(j===q.ans?"</b>":"")).join("　");
+  return '<details class="sq"><summary><span class="tagb">'+esc(q.topic)+'</span>'+esc(sPlain(q.q).slice(0,90))+'…</summary>'+
+    '<div class="sqa">'+rep(q.q)+'</div><div class="sqa">'+opts+'</div>'+
+    (q.exp?'<div class="sqa">💡 '+esc(q.exp)+'</div>':"")+(q.tip?'<div class="sqa">★ '+esc(q.tip)+'</div>':"")+'</details>';
+}
+function runSearch(){
+  const v=$("sbox").value.trim().toLowerCase(), out=$("sout");
+  if(!v){out.hidden=true;out.innerHTML="";return;}
+  const terms=v.split(/\s+/).filter(Boolean), hit=t=>terms.every(x=>t.includes(x));
+  const cards=S_CARDS.filter(c=>hit(c.low)).slice(0,10);
+  const qs=QS.filter(q=>hit((q.q+" "+q.opts.join(" ")+" "+(q.exp||"")+" "+(q.tip||"")+" "+q.topic+" "+q.src).toLowerCase())).slice(0,12);
+  let h="";
+  if(cards.length)h+='<div class="snote">📖 學習重點（點擊前往）</div>'+cards.map(c=>'<button class="scard" data-i="'+S_CARDS.indexOf(c)+'"><b>'+esc((BOOKS[c.bk]||{name:""}).name)+'</b>｜'+esc(c.title)+'</button>').join("");
+  if(qs.length)h+='<div class="snote">📝 題目（點擊展開答案與解析）</div>'+qs.map(sQHtml).join("");
+  if(!h)h='<div class="snote">找不到「'+esc(v)+'」相關內容</div>';
+  out.innerHTML=h;out.hidden=false;
+  out.querySelectorAll(".scard").forEach(b=>b.onclick=()=>{
+    const c=S_CARDS[+b.dataset.i];
+    if(c.bk&&BOOKS[c.bk]&&book!==c.bk){book=c.bk;sel.clear();quizReset();updateBook();}
+    document.querySelector('.tab[data-tab="learn"]').click();
+    c.el.scrollIntoView({behavior:"smooth",block:"start"});
+    c.el.style.outline="3px solid var(--brand)";c.el.style.outlineOffset="3px";
+    setTimeout(()=>{c.el.style.outline="";c.el.style.outlineOffset="";},2000);
+  });
+}
+let sTimer=null;
+$("sbox").addEventListener("input",()=>{clearTimeout(sTimer);sTimer=setTimeout(runSearch,200);});
+
 loadSession();
 if(CLOUD&&loggedIn())syncDown().then(()=>{if(document.querySelector("#wrong.active"))renderWrong();}).catch(()=>{});
 updateBook();
