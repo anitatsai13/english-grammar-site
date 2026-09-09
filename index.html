@@ -50,6 +50,18 @@
     padding:5px 16px;border-radius:999px}
   .gcard h3{margin:18px 0 8px;font-size:1.1rem;font-weight:900;color:var(--brand-d);border-left:5px solid var(--brand);
     padding:5px 12px;background:var(--brand-l);border-radius:0 8px 8px 0}
+  /* 展開圖（樹狀） */
+  .xmap{margin:12px 0}
+  .xroot{display:inline-block;background:var(--brand);color:#fff;font-weight:900;font-size:1.02rem;
+    border-radius:12px;padding:9px 14px;text-align:center;line-height:1.35}
+  .xroot span{display:block;font-size:.8rem;font-weight:700;opacity:.92;margin-top:3px}
+  .xbr{display:flex;flex-direction:column;gap:9px;position:relative;margin:10px 0 0 22px;padding-left:16px}
+  .xbr::before{content:"";position:absolute;left:0;top:-10px;bottom:18px;border-left:2.5px solid var(--brand)}
+  .xleaf{position:relative;background:var(--brand-l);border:1.5px solid var(--brand);border-radius:10px;
+    padding:7px 11px;font-size:.92rem;line-height:1.4}
+  .xleaf::before{content:"";position:absolute;left:-17.5px;top:50%;width:16px;border-top:2.5px solid var(--brand)}
+  .xleaf b{color:var(--brand-d)}
+  .xleaf span{display:block;font-size:.82rem;color:#555}
   .twrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:8px 0}
   table.gt{border-collapse:collapse;width:100%;min-width:480px;font-size:.9rem;background:#fff}
   table.gt th{background:var(--brand-l);color:var(--brand-d);font-weight:800;padding:7px 9px;border:1px solid #c6e2e0;text-align:center;white-space:nowrap}
@@ -904,8 +916,15 @@
 
     <section class="gcard" data-topic="現在完成式">
       <h2>1　現在完成式</h2>
-      <p>・現在完成式用來描述<b class="kw">從過去到現在</b>，「<b class="kw">（未）完成的動作</b>」、「<b class="kw">經驗</b>」或「<b class="kw">持續的狀態</b>」。<br>
-      ・動詞結構：助動詞 <b class="kw">have / has</b>＋過去分詞 <b class="kw">p.p.</b></p>
+      <div class="xmap">
+        <div class="xroot">現在完成式<span>描述「從過去到現在」</span></div>
+        <div class="xbr">
+          <div class="xleaf"><b>（未）完成的動作</b><span>already／just／yet　→ 應用（1）</span></div>
+          <div class="xleaf"><b>經驗</b><span>ever／never／once, twice…　→ 應用（2）</span></div>
+          <div class="xleaf"><b>持續的狀態</b><span>for＋一段時間／since＋過去時間　→ 應用（3）</span></div>
+        </div>
+      </div>
+      <p>・動詞結構：助動詞 <b class="kw">have / has</b>＋過去分詞 <b class="kw">p.p.</b></p>
       <h3>基本句型</h3>
       <div class="twrap"><table class="gt">
         <tr><th>句型</th><th>結構</th><th>例句</th></tr>
