@@ -1666,6 +1666,9 @@ function wBuildPool(a){
   });
   return poolArr;
 }
+let wSelB=new Set(), wSelT=new Set(); /* 錯題本 冊別／主題 篩選（空＝全部） */
+const wBookOf=r=>r.book||bookOf(r.topic)||"";
+const wRecMatch=r=>(wSelB.size===0||wSelB.has(wBookOf(r)))&&(wSelT.size===0||wSelT.has(r.topic||""));
 function renderWrong(){
   const host=$("wbox");if(!host)return;
   const a=loadM();
@@ -1673,9 +1676,19 @@ function renderWrong(){
   if(MIG_NOTE>0){h+='<p class="stat" style="color:var(--ok);font-weight:800">📥 已自動從單字網搬入 '+MIG_NOTE+' 筆文法錯題</p>';MIG_NOTE=0;}
   h+='<div class="row" style="justify-content:space-between;align-items:center"><span class="stat">共 '+a.length+' 筆錯題</span><span class="abtns"><button class="btn ghost sm" onclick="wExport()">⬇匯出</button><button class="btn ghost sm" onclick="wImport()">⬆匯入</button><button class="btn ghost sm" onclick="wClear()">🗑清空</button></span></div>';
   if(!a.length){host.innerHTML=h+'<p class="stat" style="margin-top:24px">還沒有錯題。去練習吧！答錯的會自動收進這裡 📚</p>';return;}
-  const poolArr=wBuildPool(a);
-  if(poolArr.length)h+='<div class="row"><button class="btn primary" id="wQuizBtn">📝 只練錯題（'+poolArr.length+' 題）</button></div>';
-  const groups={};a.forEach(r=>{(groups[r.round]=groups[r.round]||[]).push(r);});
+  const bCnt={};a.forEach(r=>{const b=wBookOf(r);bCnt[b]=(bCnt[b]||0)+1;});
+  wSelB=new Set([...wSelB].filter(b=>bCnt[b]));
+  const aB=a.filter(r=>wSelB.size===0||wSelB.has(wBookOf(r)));
+  const tCnt={};aB.forEach(r=>{const t=r.topic||"";tCnt[t]=(tCnt[t]||0)+1;});
+  wSelT=new Set([...wSelT].filter(t=>tCnt[t]));
+  const recs=aB.filter(r=>wSelT.size===0||wSelT.has(r.topic||""));
+  const fpool=wBuildPool(recs);
+  if(wBuildPool(a).length){
+    if(Object.keys(bCnt).length>1)h+='<div class="row" id="wBookRow"></div>';
+    h+='<div class="row" id="wTopicRow"></div>';
+    h+='<div class="row"><button class="btn primary" id="wQuizBtn">📝 只練錯題（'+fpool.length+' 題）</button></div>';
+  }
+  const groups={};recs.forEach(r=>{(groups[r.round]=groups[r.round]||[]).push(r);});
   Object.keys(groups).sort().reverse().forEach(rd=>{
     const items=groups[rd];
     h+='<div class="wtime">🕒 '+esc(new Date(rd).toLocaleString())+'（'+items.length+' 題）</div>';
@@ -1685,9 +1698,26 @@ function renderWrong(){
     });
   });
   host.innerHTML=h;
+  const mkChip=(row,active,label,fn)=>{const b=document.createElement("button");
+    b.className="chip"+(active?" active":"");b.textContent=label;
+    b.onclick=()=>{fn();renderWrong();};row.appendChild(b);};
+  const br=$("wBookRow");
+  if(br){
+    mkChip(br,wSelB.size===0,"全部冊別",()=>wSelB.clear());
+    Object.keys(BOOKS).forEach(b=>{if(!bCnt[b])return;
+      mkChip(br,wSelB.has(b),BOOKS[b].name+"（"+bCnt[b]+"）",()=>{wSelB.has(b)?wSelB.delete(b):wSelB.add(b);});});
+    if(bCnt[""])mkChip(br,wSelB.has(""),"其他（"+bCnt[""]+"）",()=>{wSelB.has("")?wSelB.delete(""):wSelB.add("");});
+  }
+  const tr=$("wTopicRow");
+  if(tr){
+    mkChip(tr,wSelT.size===0,"全部主題",()=>wSelT.clear());
+    Object.keys(tCnt).sort().forEach(t=>{
+      mkChip(tr,wSelT.has(t),(t||"—")+"（"+tCnt[t]+"）",()=>{wSelT.has(t)?wSelT.delete(t):wSelT.add(t);});});
+  }
   const qb=$("wQuizBtn");
   if(qb)qb.onclick=()=>{
-    const p=wBuildPool(loadM());
+    const p=wBuildPool(loadM().filter(wRecMatch));
+    if(!p.length){alert("此範圍沒有可重測的錯題");return;}
     document.querySelector('.tab[data-tab="quiz"]').click();
     qStart(p);
   };
