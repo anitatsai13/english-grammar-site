@@ -152,10 +152,38 @@
   .witem .wq{color:var(--ink);margin:3px 0}
   .witem .wa{color:var(--ok);font-weight:700}
   .wtime{color:var(--muted);font-size:.82rem;margin:14px 0 4px;font-weight:700}
+  /* ===== 學習進度 ===== */
+  .pgcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:10px 0}
+  .pgcard{text-align:left;background:var(--card);border:2px solid var(--line);border-radius:14px;padding:10px 12px;cursor:pointer;display:flex;flex-direction:column;gap:6px;font:inherit;color:var(--ink)}
+  .pgcard.on{border-color:var(--brand);background:var(--brand-l)}
+  .pgbar{display:flex;height:9px;background:var(--line);border-radius:99px;overflow:hidden;min-width:60px}
+  .pgbar i{display:block;height:100%;background:var(--ok)}.pgbar i.half{background:#f2b33d}
+  .pgbar.sm{width:90px;flex:0 0 90px}
+  .pgsum{font-size:.82rem;color:var(--muted);font-weight:700}
+  .pgh{margin:18px 0 8px;font-size:1.1rem;font-weight:900;color:var(--brand-d);border-left:5px solid var(--brand);padding:5px 12px;background:var(--brand-l);border-radius:0 8px 8px 0}
+  .pglist{display:flex;flex-direction:column;gap:8px}
+  .pgles{background:var(--card);border-radius:14px;box-shadow:var(--shadow);padding:10px 12px}
+  .pgles summary{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;cursor:pointer;list-style:none}
+  .pgles summary::-webkit-details-marker{display:none}
+  .pgl{font-weight:900;font-size:1.02rem;color:var(--brand-d)}
+  .pgl small{display:block;font-weight:600;font-size:.76rem;color:var(--muted)}
+  .pgst{font-size:.8rem;font-weight:800;padding:3px 9px;border-radius:99px}
+  .pgst.done{background:#ebf9f1;color:var(--ok)}.pgst.doing{background:var(--warn-bg);color:var(--warn)}.pgst.todo{background:#eef2f2;color:var(--muted)}
+  .pginfo{font-size:.85rem;color:var(--muted);font-weight:700}
+  .pgmis{font-size:.85rem;font-weight:800;color:var(--bad);margin-left:auto}
+  .pgmis.none{color:var(--muted);font-weight:700}
+  .row.pgbtns{justify-content:flex-start;margin:8px 0 6px}
+  .pgmw{display:flex;flex-direction:column;gap:5px;margin-top:4px}
+  .pgw{display:flex;flex-wrap:wrap;gap:3px 10px;align-items:baseline;padding:7px 10px;border-radius:10px;background:#fdefed;font-size:.88rem}
+  .pgw.fixed{background:#ebf9f1;opacity:.85}
+  .pgw .pgq{flex:1 1 260px;color:var(--ink)}.pgw .pga{color:var(--ok);font-weight:700}
+  .pgw .pgc{margin-left:auto;font-size:.8rem;color:var(--muted);font-weight:700}
+  @media(max-width:600px){.pgmis{margin-left:0;width:100%}.pgw .pgc{margin-left:0;width:100%}}
   @media(max-width:560px){
     .opts{grid-template-columns:1fr}
     table.gt{font-size:.84rem}
     header h1{font-size:1.3rem}
+    .tabs{gap:6px}.tab{font-size:.9rem;padding:10px 4px}
   }
 </style>
 </head>
@@ -171,6 +199,7 @@
   <div class="tabs">
     <button class="tab active" data-tab="learn">📖 學習重點</button>
     <button class="tab" data-tab="quiz">📝 練習題</button>
+    <button class="tab" data-tab="progress">📈 學習進度</button>
     <button class="tab" data-tab="wrong">📕 錯題本</button>
   </div>
 
@@ -2308,6 +2337,11 @@
     <div id="qbox"></div>
   </div>
 
+  <!-- ================= 學習進度 ================= -->
+  <div class="panel" id="progress">
+    <div id="pgbox"></div>
+  </div>
+
   <!-- ================= 錯題本 ================= -->
   <div class="panel" id="wrong">
     <div id="wbox"></div>
@@ -2350,6 +2384,7 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
   document.querySelectorAll(".tab").forEach(x=>x.classList.toggle("active",x===t));
   document.querySelectorAll(".panel").forEach(p=>p.classList.toggle("active",p.id===t.dataset.tab));
   if(t.dataset.tab==="wrong")renderWrong();
+  if(t.dataset.tab==="progress")renderProgress();
   window.scrollTo({top:0});
 });
 
@@ -2455,6 +2490,7 @@ function qAnswer(i){
     if(+b.dataset.i===q.ans)b.classList.add("right");
     else if(+b.dataset.i===i)b.classList.add("wrong");});
   const ok=i===q.ans;
+  {const L=pgLocQ(q);if(L)progLog(L.g,L.l,L.k,ok);}
   if(ok)QZ.score++;
   else{QZ.wrong.push(q);logMistake({book:bookOf(q.topic),topic:q.topic,qk:q.q.slice(0,60),correct:"("+"ABCD"[q.ans]+") "+q.opts[q.ans]});}
   const fb=$("fb");
@@ -2550,7 +2586,8 @@ async function syncDown(){if(!CLOUD||!loggedIn())return;try{
   let n=0;try{n=await migrateFromVocab();}catch(e){console.warn('migrate',e)}
   const cloud=await cloudLoad();const merged=mergeArr(loadM(),cloud);saveM(merged);await cloudSave(merged);
   if(n>0)MIG_NOTE+=n;
-}catch(e){console.warn('sync',e)}}
+}catch(e){console.warn('sync',e)}
+  await progSyncDown();}
 function cloudMirror(){if(CLOUD&&loggedIn())cloudSave(loadM()).catch(()=>{})}
 function newRound(){quizRound=new Date().toISOString();}
 function logMistake(rec){rec.t=new Date().toISOString();rec.round=quizRound||rec.t;var a=loadM();a.push(rec);saveM(a);cloudMirror();}
@@ -2654,6 +2691,154 @@ function renderWrong(){
     qStart(p);
   };
 }
+/* ===== 學習進度：記錄每一題的作答，依「冊別／Unit」顯示完成度與錯題 =====
+   記錄點：qAnswer（一般測驗、練習此主題、只測錯的、再測一次、錯題本「只練錯題」全部走這裡）。
+   單元＝練習題的 Unit 分組（groupByUnit，不屬任何 Unit 的主題歸「補充」）；沒有 Unit 的冊（進階・綜合）每個主題各算一個單元。
+   項目鍵＝錯題本用的 qk（題幹前 60 字）；同一單元內 qk 相同但內容不同的題（如同一篇閱讀測驗）依題庫順序加 #2、#3…
+   PROG 結構：{ "冊|單元": { q:{項目鍵:[作答次數,答對次數,最近作答,最近答對]} } }
+   雲端：與錯題本同一張表，app=grammar_progress（登入後跨裝置合併）。 */
+const PROGKEY='eg_progress_v1',PROGAPP='grammar_progress';
+function progLoad(){try{return JSON.parse(localStorage.getItem(PROGKEY)||'{}')||{}}catch(e){return {}}}
+function progSave(p){try{localStorage.setItem(PROGKEY,JSON.stringify(p))}catch(e){}}
+let _progT=null;
+function progLog(group,unit,key,ok){
+  if(!group||!unit||!key)return;
+  const p=progLoad(),k=group+'|'+unit,now=new Date().toISOString();
+  const u=p[k]||(p[k]={q:{}}),m=u.q||(u.q={});
+  const r=m[key]||(m[key]=[0,0,'','']);
+  r[0]++;if(ok){r[1]++;r[3]=now;}r[2]=now;
+  progSave(p);
+  if(CLOUD&&loggedIn()){clearTimeout(_progT);_progT=setTimeout(()=>progCloudSave(progLoad()).catch(()=>{}),1500);}
+}
+function progMerge(a,b){
+  const o=JSON.parse(JSON.stringify(a||{}));
+  Object.keys(b||{}).forEach(k=>{const ub=b[k]||{},ua=o[k]||(o[k]={q:{}});
+    Object.keys(ub).forEach(t=>{const mb=ub[t]||{},ma=ua[t]||(ua[t]={});
+      Object.keys(mb).forEach(id=>{const x=ma[id],y=mb[id];if(!Array.isArray(y))return;
+        ma[id]=Array.isArray(x)?[Math.max(x[0]||0,y[0]||0),Math.max(x[1]||0,y[1]||0),(x[2]||'')>(y[2]||'')?x[2]:y[2],(x[3]||'')>(y[3]||'')?x[3]:y[3]]:y.slice();});});});
+  return o;
+}
+async function progCloudLoad(){if(!await authOK())return null;const j=await sb('/rest/v1/mistakes?select=data&user_id=eq.'+SESSION.user.id+'&app=eq.'+PROGAPP);const d=j&&j[0]&&j[0].data;return (d&&!Array.isArray(d)&&typeof d==='object')?d:{};}
+async function progCloudSave(d){if(!await authOK())return;await sb('/rest/v1/mistakes?on_conflict=user_id,app',{method:'POST',headers:{'Prefer':'resolution=merge-duplicates,return=minimal'},body:JSON.stringify({user_id:SESSION.user.id,app:PROGAPP,data:d,updated_at:new Date().toISOString()})});}
+async function progSyncDown(){if(!CLOUD||!loggedIn())return;try{const c=await progCloudLoad();if(c===null)return;const m=progMerge(progLoad(),c);progSave(m);await progCloudSave(m);}catch(e){console.warn('prog sync',e)}}
+
+/* ---- 單元劃分（與練習題的 Unit 分組一致）：U[冊]=[{id,label,sub,topics,items:[{k,q}]}]；M：題目物件 → {g,l,k} ---- */
+const pgQK=q=>String(q.q).slice(0,60);
+let _pgB=null;
+function pgBuild(){
+  if(_pgB)return _pgB;
+  const U={},M=new Map();
+  Object.keys(BOOKS).forEach(bk=>{
+    const live=BOOKS[bk].topics.filter(t=>cnt(t));
+    const us=unitsOf(bk).length?groupByUnit(bk,live).map(g=>({id:g.label,label:g.label,sub:g.sub,topics:g.topics}))
+      :live.map(t=>({id:t,label:t,sub:'',topics:[t]}));
+    us.forEach(u=>{const seen={};u.items=[];
+      QS.forEach(q=>{if(u.topics.indexOf(q.topic)<0)return;
+        const b=pgQK(q),sig=q.q+'\u0001'+q.opts.join('\u0001')+'\u0001'+q.ans,v=seen[b]||(seen[b]=[]);
+        let i=v.indexOf(sig);const isNew=i<0;if(isNew){i=v.length;v.push(sig);}
+        const k=i?b+'#'+(i+1):b;
+        if(isNew)u.items.push({k:k,q:q});
+        M.set(q,{g:bk,l:u.id,k:k});});});
+    U[bk]=us.filter(u=>u.items.length);
+  });
+  return _pgB={U:U,M:M};
+}
+function pgUnits(bk){return pgBuild().U[bk]||[];}
+/* 題目 → 冊｜單元｜項目鍵（題目物件不在索引時，用主題＋題幹找回題庫中的同一題） */
+function pgLocQ(q){
+  if(!q)return null;const B=pgBuild();let L=B.M.get(q);
+  if(!L){const x=QS.find(y=>y.topic===q.topic&&y.q===q.q&&y.ans===q.ans);if(x)L=B.M.get(x);}
+  return L||null;
+}
+/* 錯題本的一筆 → 題庫中的原題（qk＋主題比對；同篇閱讀測驗 qk 相同時再用正解區分；主題對不上時只用 qk） */
+function pgMisQ(r){
+  if(!r||!r.qk)return null;
+  const ok=x=>"("+"ABCD"[x.ans]+") "+x.opts[x.ans]===r.correct;
+  let c=QS.filter(x=>x.topic===r.topic&&pgQK(x)===r.qk);
+  if(!c.length)c=QS.filter(x=>pgQK(x)===r.qk);
+  if(!c.length)return null;
+  return c.find(ok)||c[0];
+}
+function pgShort(s){s=String(s||'').replace(/<br\s*\/?>/gi,' ').replace(/<[^>]*>/g,'').replace(/\s+/g,' ').trim();return s.length>90?s.slice(0,44)+' … '+s.slice(-40):s;}
+let _misIdx=null;
+function progMisIndex(P){
+  const idx={},stat={all:0,placed:0,lost:0};
+  loadM().forEach(r=>{stat.all++;
+    const q=pgMisQ(r),L=q&&pgLocQ(q);if(!L){stat.lost++;return;}stat.placed++;
+    const key=L.g+'|'+L.l,m=idx[key]||(idx[key]={});
+    const o=m[L.k]||(m[L.k]={k:L.k,q:q,n:0,last:'',rounds:new Set()});
+    o.n++;const t=r.t||'';if(t>o.last)o.last=t;if(r.round)o.rounds.add(r.round);});
+  Object.keys(idx).forEach(key=>{const u=(P[key]||{}).q||{};
+    Object.values(idx[key]).forEach(o=>{const a=u[o.k];o.fixed=!!(a&&a[3])&&a[3]>o.last;});});
+  return {idx:idx,stat:stat};
+}
+function progMistakes(g,l,P){
+  const m=((_misIdx||progMisIndex(P)).idx[g+'|'+l])||{};
+  return Object.values(m).sort((x,y)=>(x.fixed-y.fixed)||(y.n-x.n)||(y.last>x.last?1:-1));
+}
+/* 舊紀錄：本功能上線前的「此範圍最佳成績」（eg_best_冊_範圍）也算「練習過」 */
+function progOldBest(bk,topics){
+  let best=0;const pre='eg_best_'+bk+'_';
+  try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(!k||k.indexOf(pre)!==0)continue;
+    const sc=k.slice(pre.length);
+    if(sc==='all'||sc.split('|').some(t=>topics.indexOf(t)>=0)){const v=+(localStorage.getItem(k)||0);if(v>best)best=v;}}}catch(e){}
+  return best;
+}
+let progGroup=null;
+function progLessonStat(g,unit,P){
+  const u=(P[g+'|'+unit.id]||{}).q||{};
+  let seen=0,tries=0,right=0,last='';
+  unit.items.forEach(it=>{const r=u[it.k];if(r&&r[0]){seen++;tries+=r[0];right+=r[1];if(r[2]>last)last=r[2];}});
+  const old=progOldBest(g,unit.topics),mis=progMistakes(g,unit.id,P);
+  mis.forEach(m=>{if(m.last>last)last=m.last;});
+  const pending=mis.filter(m=>!m.fixed).length;
+  let st='todo';
+  if(unit.items.length&&seen>=unit.items.length)st='done';
+  else if(seen||old||mis.length)st='doing';
+  return {n:unit.items.length,seen:seen,tries:tries,right:right,last:last,old:old,mis:mis,pending:pending,st:st};
+}
+function progFmt(iso){if(!iso)return '';const d=new Date(iso);return isNaN(d)?'':(d.getMonth()+1)+'/'+d.getDate();}
+function renderProgress(){
+  const host=$("pgbox");if(!host)return;
+  const P=progLoad();
+  _misIdx=progMisIndex(P);const MS=_misIdx.stat;
+  const gl=Object.keys(BOOKS);
+  if(!progGroup||gl.indexOf(progGroup)<0)progGroup=book;
+  let h='<p class="stat">每答一題就會記錄。<b>完成</b>＝這個單元每一題都答過至少一次；<b>練習中</b>＝已開始但還沒全部答過；錯題「已訂正」＝錯了之後又答對過。</p>';
+  if(MS.all)h+='<p class="stat">📕 已讀入錯題本 '+MS.all+' 筆，'+MS.placed+' 筆已歸到各單元'+(MS.lost?'（'+MS.lost+' 筆對應不到題庫原題，略過）':'')+'。</p>';
+  const card=g=>{const U=pgUnits(g);let d=0,i=0,pend=0;
+    U.forEach(u=>{const s=progLessonStat(g,u,P);if(s.st==='done')d++;else if(s.st==='doing')i++;pend+=s.pending;});
+    const tot=U.length;
+    return '<button class="pgcard'+(g===progGroup?' on':'')+'" data-g="'+g+'"><b>'+esc(BOOKS[g].name)+'</b>'+
+      '<span class="pgbar"><i style="width:'+(tot?Math.round(d/tot*100):0)+'%"></i><i class="half" style="width:'+(tot?Math.round(i/tot*100):0)+'%"></i></span>'+
+      '<span class="pgsum">✅ '+d+'　🟡 '+i+'　⬜ '+(tot-d-i)+(pend?'　❌ 待訂正 '+pend:'')+'</span></button>';};
+  h+='<div class="pgcards">'+gl.map(card).join('')+'</div>';
+  const g=progGroup,U=pgUnits(g);
+  h+='<h3 class="pgh">'+esc(BOOKS[g].name)+'</h3><div class="pglist">';
+  if(!U.length)h+='<p class="stat">本冊題目尚未建立。</p>';
+  U.forEach((unit,ui)=>{const s=progLessonStat(g,unit,P);
+    const badge=s.st==='done'?'<span class="pgst done">✅ 完成</span>':s.st==='doing'?'<span class="pgst doing">🟡 練習中</span>':'<span class="pgst todo">⬜ 未開始</span>';
+    const rate=s.tries?Math.round(s.right/s.tries*100)+'%':'—';
+    const info=['已答 '+s.seen+'／'+s.n+' 題','答對率 '+rate];
+    if(s.old&&!s.tries)info.push('舊紀錄最佳 '+s.old+' 分');
+    if(s.last)info.push('最近 '+progFmt(s.last));
+    h+='<details class="pgles"'+(s.mis.length&&s.pending?' open':'')+'><summary><span class="pgl">'+esc(unit.label)+(unit.sub?'<small>'+esc(unit.sub)+'</small>':'')+'</span>'+badge+
+      '<span class="pgbar sm"><i style="width:'+(s.n?Math.round(s.seen/s.n*100):0)+'%"></i></span>'+
+      '<span class="pginfo">'+info.join('　')+'</span>'+
+      '<span class="pgmis'+(s.mis.length?'':' none')+'">'+(s.mis.length?'❌ 錯題 '+s.mis.length+(s.pending?'（待訂正 '+s.pending+'）':'（都已訂正）'):'沒有錯題')+'</span></summary>'+
+      '<div class="pgbody"><div class="row pgbtns"><button class="btn primary sm" data-pq="'+ui+'">📝 練習這個單元</button>'+(s.mis.length?'<button class="btn ghost sm" data-pw="'+ui+'">📕 到錯題本</button>':'')+'</div>'+
+      (s.mis.length?'<div class="pgmw">'+s.mis.map(m=>'<div class="pgw'+(m.fixed?' fixed':'')+'"><span class="tagb">'+esc(m.q.topic)+'</span><span class="pgq">'+esc(pgShort(m.q.q))+'</span>'+
+        '<span class="pga">正解 ('+"ABCD"[m.q.ans]+') '+esc(m.q.opts[m.q.ans])+'</span><span class="pgc">錯 '+m.n+' 次・'+progFmt(m.last)+'　'+(m.fixed?'✔ 已訂正':'✘ 待訂正')+'</span></div>').join('')+'</div>':'')+
+      '</div></details>';});
+  h+='</div>';
+  host.innerHTML=h;
+  const tab=t=>{const tb=document.querySelector('.tab[data-tab="'+t+'"]');if(tb)tb.click();window.scrollTo(0,0);};
+  host.querySelectorAll('.pgcard').forEach(b=>b.onclick=()=>{progGroup=b.dataset.g;renderProgress();});
+  host.querySelectorAll('[data-pq]').forEach(b=>b.onclick=()=>{const u=U[+b.dataset.pq];if(!u)return;
+    book=g;sel.clear();u.topics.forEach(t=>sel.add(t));quizReset();updateBook();tab('quiz');});
+  host.querySelectorAll('[data-pw]').forEach(b=>b.onclick=()=>{const u=U[+b.dataset.pw];if(!u)return;
+    wSelB=new Set([g]);wSelT=new Set(u.topics);tab('wrong');});
+}
 /* ===== 搜尋 ===== */
 const S_CARDS=[...document.querySelectorAll(".gcard")].map(c=>{
   const pane=c.closest(".lpane");
@@ -2690,7 +2875,7 @@ let sTimer=null;
 $("sbox").addEventListener("input",()=>{clearTimeout(sTimer);sTimer=setTimeout(runSearch,200);});
 
 loadSession();
-if(CLOUD&&loggedIn())syncDown().then(()=>{if(document.querySelector("#wrong.active"))renderWrong();}).catch(()=>{});
+if(CLOUD&&loggedIn())syncDown().then(()=>{if(document.querySelector("#wrong.active"))renderWrong();if(document.querySelector("#progress.active"))renderProgress();}).catch(()=>{});
 updateBook();
 </script>
 </body>
