@@ -2952,7 +2952,7 @@ function showBest(){
   $("beststat").textContent=b?("此範圍最佳成績："+b+" 分"):"";
 }
 /* 克漏字成組：題目有 grp 時，抽到其中一題就把整篇（同 grp）依原順序接在一起出題；錯題重測（list）不展開 */
-function qGroupCloze(arr){const out=[],done=new Set();arr.forEach(q=>{if(!q.grp){out.push(q);return;}if(done.has(q.grp))return;done.add(q.grp);QS.forEach(x=>{if(x.grp===q.grp)out.push(x);});});return out;}
+function qGroupCloze(arr){const out=[],done=new Set();arr.forEach(q=>{if(!q.grp){out.push(q);return;}if(done.has(q.grp))return;done.add(q.grp);const no=x=>+((x.q.match(/第 ?(\d+) ?題/)||[])[1]||0);out.push(...QS.filter(x=>x.grp===q.grp).sort((a,b)=>no(a)-no(b)));});return out;}
 function qStart(list){
   const src=list?list:pool();
   if(!src.length){alert("本冊題目尚未建立。\n請先到「學習重點」看各 Unit 的卡片待補清單，或切換到其他冊練習。");return;}
