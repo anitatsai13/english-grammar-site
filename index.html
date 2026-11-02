@@ -2821,6 +2821,9 @@
   <div class="panel" id="quiz">
     <div class="row" id="qchips"></div>
     <div class="row"><button class="btn primary" id="startBtn">📝 開始測驗</button></div>
+    <div id="randBox"><div class="row" style="justify-content:center;gap:8px;margin-top:8px">
+      <button class="btn ghost rand" data-n="10">🎲 隨機 10 題</button><button class="btn ghost rand" data-n="20">🎲 隨機 20 題</button><button class="btn ghost rand" data-n="30">🎲 隨機 30 題</button></div>
+      <p class="stat" id="randHint"></p></div>
     <p class="stat" id="beststat"></p>
     <div id="qbox"></div>
   </div>
@@ -2881,7 +2884,7 @@ document.querySelectorAll(".tab").forEach(t=>t.onclick=()=>{
 /* 冊別切換 + 學習重點目錄 + 練習按鈕 */
 function quizReset(){
   QZ=null;$("qbox").innerHTML="";
-  $("startBtn").style.display="";$("qchips").style.display="";$("beststat").style.display="";
+  $("startBtn").style.display="";$("qchips").style.display="";$("beststat").style.display="";$("randBox").style.display="";
 }
 function renderBooks(){
   const box=$("bookRow");box.innerHTML="";
@@ -2946,6 +2949,27 @@ function renderChips(){
   });
   $("startBtn").textContent="📝 開始測驗（"+qGroupCloze(pool()).length+" 題）";
   showBest();
+  {const P=qPgAll(),c=[0,0,0];pool().forEach(q=>c[qTier(q,P).tier]++);
+   $("randHint").textContent="隨機出題順序：沒做過 "+c[0]+" 題 → 答錯過 "+c[1]+" 題（錯越多越先）→ 只答對過 "+c[2]+" 題（答對越多越後面）";}
+}
+/* 隨機練習的選題優先順序（開始測驗整個範圍也照這個順序）：
+   ① 沒做過 → ② 答錯次數多的先 → ③ 答對次數多的最後；次數都相同的隨機。
+   次數取自學習進度（含功能上線前錯題本的舊紀錄 pgLegacy）。 */
+function qPgAll(){return pgCombine(progLoad(),pgLegacy().L);}
+function qTier(q,P){
+  const L=pgLocQ(q),r=L&&((P[L.g+'|'+L.l]||{}).q||{})[L.k];
+  const n=r?r[0]||0:0,ok=r?r[1]||0:0,bad=Math.max(0,n-ok);
+  return {n:n,ok:ok,bad:bad,tier:!n?0:bad?1:2};
+}
+function qPrio(arr,P){
+  return arr.map(q=>({q:q,s:qTier(q,P),r:Math.random()}))
+    .sort((x,y)=>(x.s.tier-y.s.tier)||(y.s.bad-x.s.bad)||(x.s.ok-y.s.ok)||(x.r-y.r)).map(x=>x.q);
+}
+/* 依優先順序取 n 題；克漏字整篇一起出，篇章不切斷（可能略超過 n 題） */
+function qRand(n){
+  const P=qPgAll(),L=qGroupCloze(qPrio(pool(),P)),out=[];
+  for(let i=0;i<L.length;i++){if(out.length>=n&&!(L[i].grp&&L[i].grp===L[i-1].grp))break;out.push(L[i]);}
+  qStart(out,{rand:n,P:P});
 }
 function showBest(){
   let b=null;try{b=localStorage.getItem("eg_best_"+scopeKey());}catch(e){}
@@ -2953,22 +2977,30 @@ function showBest(){
 }
 /* 克漏字成組：題目有 grp 時，抽到其中一題就把整篇（同 grp）依原順序接在一起出題；錯題重測（list）不展開 */
 function qGroupCloze(arr){const out=[],done=new Set();arr.forEach(q=>{if(!q.grp){out.push(q);return;}if(done.has(q.grp))return;done.add(q.grp);const no=x=>+((x.q.match(/第 ?(\d+) ?題/)||[])[1]||0);out.push(...QS.filter(x=>x.grp===q.grp).sort((a,b)=>no(a)-no(b)));});return out;}
-function qStart(list){
+function qStart(list,opt){
+  opt=opt||{};
   const src=list?list:pool();
   if(!src.length){alert("本冊題目尚未建立。\n請先到「學習重點」看各 Unit 的卡片待補清單，或切換到其他冊練習。");return;}
   newRound();
-  QZ={list:list?list.slice():shuffle(pool()),i:0,score:0,wrong:[],full:!list&&sel.size===0};
-  QZ.src=list?list.slice():null;
-  if(list)QZ.list=shuffle(QZ.list);else QZ.list=qGroupCloze(QZ.list);
+  const P=opt.P||qPgAll();
+  QZ={list:list?list.slice():qPrio(pool(),P),i:0,score:0,wrong:[],full:!list&&sel.size===0};
+  QZ.src=list&&!opt.rand?list.slice():null;
+  QZ.rand=opt.rand||0;QZ.P=P;
+  if(opt.rand){}else if(list)QZ.list=shuffle(QZ.list);else QZ.list=qGroupCloze(QZ.list);
   QZ.fullScope=!list;
-  $("startBtn").style.display="none";$("qchips").style.display="none";$("beststat").style.display="none";
+  $("startBtn").style.display="none";$("qchips").style.display="none";$("beststat").style.display="none";$("randBox").style.display="none";
   qRender();
+}
+/* 題目的作答狀態標籤（測驗開始時的次數） */
+function qTag(q){
+  const s=qTier(q,QZ.P);
+  return !s.n?'🆕 沒做過':s.bad?'❌ 錯過 '+s.bad+' 次'+(s.ok?'・對 '+s.ok+' 次':''):'✅ 答對過 '+s.ok+' 次';
 }
 function qRender(){
   const q=QZ.list[QZ.i],n=QZ.list.length;
   const isExam=/會考|基測/.test(q.src);
   let h='<div class="qcard">';
-  h+='<div><span class="src'+(isExam?" exam":"")+'">'+esc(q.src)+(q.rate?("　通過率"+q.rate+"%"):"")+'</span><span class="qno">第 '+(QZ.i+1)+' / '+n+' 題　｜　<span class="score">得分 '+QZ.score+'</span>　｜　'+esc(q.topic)+'</span></div>';
+  h+='<div><span class="src'+(isExam?" exam":"")+'">'+esc(q.src)+(q.rate?("　通過率"+q.rate+"%"):"")+'</span><span class="qno">第 '+(QZ.i+1)+' / '+n+' 題　｜　<span class="score">得分 '+QZ.score+'</span>　｜　'+esc(q.topic)+'　｜　'+qTag(q)+'</span></div>';
   h+='<div class="stem">'+rep(q.q)+'</div><div class="opts">';
   q.opts.forEach((o,i)=>{h+='<button class="opt" data-i="'+i+'">('+"ABCD"[i]+') '+esc(o)+'</button>';});
   h+='</div><div class="fb" id="fb"></div>';
@@ -3006,18 +3038,19 @@ function qEnd(done){
   let h='<div class="qcard fin">'+(done===true?'<div>🎉 測驗完成</div>':'<div>測驗結束</div>');
   h+='<div class="big">'+QZ.score+' / '+answered+'</div><div class="stat">答對率 '+pct+'%</div><div class="row">';
   if(QZ.wrong.length)h+='<button class="btn primary" id="againWrong">🔁 只測錯的（'+QZ.wrong.length+'）</button>';
-  h+='<button class="btn ghost" id="againAll">↻ 再測一次</button><button class="btn ghost" id="backBtn">⬅ 回題目選擇</button></div>';
+  h+='<button class="btn ghost" id="againAll">'+(QZ.rand?'🎲 再抽 '+QZ.rand+' 題':'↻ 再測一次')+'</button><button class="btn ghost" id="backBtn">⬅ 回題目選擇</button></div>';
   if(QZ.wrong.length){h+='<div style="text-align:left;margin-top:10px"><b>📌 需複習（'+QZ.wrong.length+'）</b>';
     QZ.wrong.forEach(q=>{h+='<div class="stat" style="text-align:left">・'+esc(q.topic)+' — 正解 ('+"ABCD"[q.ans]+') '+esc(q.opts[q.ans])+'</div>';});
     h+='</div>';}
   h+='</div>';
   $("qbox").innerHTML=h;
-  const w=QZ.wrong.slice(),again=QZ.src;
+  const w=QZ.wrong.slice(),again=QZ.src,rn=QZ.rand;
   if(QZ.wrong.length)$("againWrong").onclick=()=>qStart(w);
-  $("againAll").onclick=()=>qStart(again||undefined);
+  $("againAll").onclick=()=>rn?qRand(rn):qStart(again||undefined);
   $("backBtn").onclick=()=>{quizReset();renderChips();};
 }
 $("startBtn").onclick=()=>qStart();
+document.querySelectorAll(".rand").forEach(b=>b.onclick=()=>qRand(+b.dataset.n));
 
 /* ===== 會員帳號 + 錯題本（與英文單字學習網同一組帳號） ===== */
 const SUPABASE_URL="https://cpjkraxbvdhnvjggophz.supabase.co";
