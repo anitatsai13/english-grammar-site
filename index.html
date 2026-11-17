@@ -177,6 +177,7 @@
   .pgmw{display:flex;flex-direction:column;gap:5px;margin-top:4px}
   .pgw{display:flex;flex-wrap:wrap;gap:3px 10px;align-items:baseline;padding:7px 10px;border-radius:10px;background:#fdefed;font-size:.88rem}
   .pgw.fixed{background:#ebf9f1;opacity:.85}
+  .witem.wfixed{opacity:.6}
   .pgw .pgq{flex:1 1 260px;color:var(--ink)}.pgw .pga{color:var(--ok);font-weight:700}
   .pgw .pgc{margin-left:auto;font-size:.8rem;color:var(--muted);font-weight:700}
   @media(max-width:600px){.pgmis{margin-left:0;width:100%}.pgw .pgc{margin-left:0;width:100%}}
@@ -3140,14 +3141,24 @@ window.wImport=function(){var i=document.createElement('input');i.type='file';i.
 }catch(e){alert('匯入失敗:'+e.message)}};rd.readAsText(f);};i.click();};
 window.wClear=function(){if(!confirm('確定清空所有錯題?'))return;saveM([]);if(CLOUD&&loggedIn())cloudSave([]).catch(function(){});renderWrong();};
 /* 錯題 → 原題：用 pgMisQ（qk＋主題，同題幹多題時用紀錄的正解文字對到「那一小題」）；同一題只出一次；找不到原題的筆數記在 .miss */
-function wBuildPool(a){
-  const seen=new Set(),poolArr=[];let miss=0;
+/* 已訂正＝這題最後一次答錯之後，學習進度裡有更晚的「答對」紀錄（r[3]）。
+   only=true：只回傳還沒訂正的；poolArr.fixed＝已訂正的題數 */
+function wFixedSet(a){
+  const P=progLoad(),lastMis=new Map(),out=new Set();
+  a.forEach(r=>{const q=pgMisQ(r);if(!q)return;const t=r.t||'';if(!lastMis.has(q)||t>lastMis.get(q))lastMis.set(q,t);});
+  lastMis.forEach((t,q)=>{const L=pgLocQ(q),x=L&&((P[L.g+'|'+L.l]||{}).q||{})[L.k];if(x&&x[3]&&x[3]>t)out.add(q);});
+  return out;
+}
+function wBuildPool(a,only){
+  const seen=new Set(),poolArr=[],fx=wFixedSet(a);let miss=0,fixed=0;
   a.forEach(r=>{
     const q=pgMisQ(r);
     if(!q){miss++;return;}
-    if(seen.has(q))return;seen.add(q);poolArr.push(q);
+    if(seen.has(q))return;seen.add(q);
+    if(fx.has(q)){fixed++;if(only)return;}
+    poolArr.push(q);
   });
-  poolArr.miss=miss;
+  poolArr.miss=miss;poolArr.fixed=fixed;
   return poolArr;
 }
 let wSelB=new Set(), wSelT=new Set(); /* 錯題本 冊別／主題 篩選（空＝全部） */
@@ -3166,11 +3177,13 @@ function renderWrong(){
   const tCnt={};aB.forEach(r=>{const t=r.topic||"";tCnt[t]=(tCnt[t]||0)+1;});
   wSelT=new Set([...wSelT].filter(t=>tCnt[t]));
   const recs=aB.filter(r=>wSelT.size===0||wSelT.has(r.topic||""));
-  const fpool=wBuildPool(recs);
+  const fpool=wBuildPool(recs,true),fall=wBuildPool(recs),fxSet=wFixedSet(a);
   if(wBuildPool(a).length){
     if(Object.keys(bCnt).length>1)h+='<div class="row" id="wBookRow"></div>';
     h+='<div class="row" id="wTopicRow"></div>';
-    h+='<div class="row"><button class="btn primary" id="wQuizBtn">📝 只練錯題（'+fpool.length+' 題）</button></div>';
+    h+='<div class="row"><button class="btn primary" id="wQuizBtn"'+(fpool.length?'':' disabled')+'>📝 只練錯題（還沒訂正 '+fpool.length+' 題）</button>'+
+      (fall.fixed?'<button class="btn ghost" id="wQuizAll">🔁 全部錯題（含已訂正 '+fall.fixed+' 題，共 '+fall.length+' 題）</button>':'')+'</div>';
+    if(!fpool.length&&fall.fixed)h+='<p class="stat" style="color:var(--ok)">🎉 這個範圍的錯題都訂正過了（錯過之後又答對）。想再複習可以按「全部錯題」。</p>';
     if(fpool.miss)h+='<p class="stat">（'+fpool.miss+' 筆錯題找不到原題，無法重測，已略過）</p>';
   }
   const groups={};recs.forEach(r=>{(groups[r.round]=groups[r.round]||[]).push(r);});
@@ -3179,7 +3192,8 @@ function renderWrong(){
     h+='<div class="wtime">🕒 '+esc(new Date(rd).toLocaleString())+'（'+items.length+' 題）</div>';
     items.forEach(r=>{
       const bn=r.book&&BOOKS[r.book]?BOOKS[r.book].name.replace(/^..\s*/,''):'';
-      h+='<div class="witem"><span class="wt">'+esc(bn?bn+'｜':'')+esc(r.topic||'')+'</span><div class="wq">'+esc(String(r.qk||'').replace(/⟦[^⟧]*⟧/g,"（附圖）"))+'…</div><span class="wa">正解 '+esc(r.correct||'')+'</span></div>';
+      const rq=pgMisQ(r),rfx=rq&&fxSet.has(rq);
+      h+='<div class="witem'+(rfx?' wfixed':'')+'"><span class="wt">'+esc(bn?bn+'｜':'')+esc(r.topic||'')+(rfx?'　<b style="color:var(--ok)">✔ 已訂正</b>':'')+'</span><div class="wq">'+esc(String(r.qk||'').replace(/⟦[^⟧]*⟧/g,"（附圖）"))+'…</div><span class="wa">正解 '+esc(r.correct||'')+'</span></div>';
     });
   });
   host.innerHTML=h;
@@ -3214,13 +3228,14 @@ function renderWrong(){
     });
     loose.forEach(t=>mkChip(tr,wSelT.has(t),(t||"—")+"（"+tCnt[t]+"）",()=>{wSelT.has(t)?wSelT.delete(t):wSelT.add(t);}));
   }
-  const qb=$("wQuizBtn");
-  if(qb)qb.onclick=()=>{
-    const p=wBuildPool(loadM().filter(wRecMatch));
-    if(!p.length){alert("此範圍沒有可重測的錯題");return;}
+  const wGo=only=>{
+    const p=wBuildPool(loadM().filter(wRecMatch),only);
+    if(!p.length){alert(only?"這個範圍的錯題都訂正過了":"此範圍沒有可重測的錯題");return;}
     document.querySelector('.tab[data-tab="quiz"]').click();
     qStart(p);
   };
+  const qb=$("wQuizBtn");if(qb)qb.onclick=()=>wGo(true);
+  const qa=$("wQuizAll");if(qa)qa.onclick=()=>wGo(false);
 }
 /* ===== 學習進度：記錄每一題的作答，依「冊別／Unit」顯示完成度與錯題 =====
    記錄點：qAnswer（一般測驗、練習此主題、只測錯的、再測一次、錯題本「只練錯題」全部走這裡）。
